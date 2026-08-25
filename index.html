@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Snake">
+<meta name="theme-color" content="#020c18">
+<title>Fredriks Snake</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --accent: #4ecca3;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #eef;
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(26,0,60,0.85) 0%, transparent 60%),
+      radial-gradient(ellipse at 85% 85%, rgba(0,60,60,0.6) 0%, transparent 55%),
+      linear-gradient(160deg, #000814 0%, #001233 55%, #000814 100%);
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: calc(var(--safe-top) + 8px) 10px calc(var(--safe-bottom) + 8px);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  h1 {
+    font-size: clamp(1.1rem, 5vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #4ecca3, #7ad7ff, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+    flex: 0 0 auto;
+  }
+
+  #hud {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 460px;
+    margin-bottom: 8px;
+    flex: 0 0 auto;
+  }
+
+  .box {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 6px 4px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  .box label {
+    display: block;
+    font-size: 0.6rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0.55;
+  }
+  .box span { font-size: 1.15rem; font-weight: 700; }
+  #score { color: var(--accent); }
+  #best { color: #ffd76b; }
+  #len { color: #7ad7ff; }
+
+  #stage {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 460px;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #frame {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(78,204,163,0.25);
+    box-shadow: 0 0 40px rgba(78,204,163,0.12), inset 0 0 40px rgba(0,0,0,0.6);
+    background: #020c18;
+    touch-action: none;
+  }
+
+  canvas { display: block; touch-action: none; }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(2,8,20,0.9);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    text-align: center;
+    transition: opacity 0.25s;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #ov-title {
+    font-size: clamp(1.3rem, 7vw, 2rem);
+    letter-spacing: 3px;
+    font-weight: 800;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(78,204,163,0.5);
+  }
+  #ov-sub { font-size: 0.85rem; opacity: 0.75; line-height: 1.4; }
+
+  button {
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-size: 0.95rem;
+    color: #012;
+    background: linear-gradient(135deg, #4ecca3, #7ad7ff);
+    box-shadow: 0 6px 20px rgba(78,204,163,0.3);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:active { transform: scale(0.96); }
+
+  button.ghost {
+    background: transparent;
+    color: #cfe;
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: none;
+    padding: 9px 20px;
+    font-size: 0.8rem;
+  }
+
+  #ov-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+  /* ---- Skins ---- */
+  #skins {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 8px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .skin {
+    background: rgba(255,255,255,0.05);
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 6px 4px 5px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .skin.sel { border-color: var(--accent); background: rgba(78,204,163,0.12); }
+  .skin canvas { margin: 0 auto; border-radius: 6px; }
+  .skin span { display: block; font-size: 0.6rem; margin-top: 3px; opacity: 0.8; }
+
+  /* ---- Highscore ---- */
+  #hs-list { width: 100%; max-width: 320px; font-size: 0.8rem; }
+  #hs-list .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 8px;
+  }
+  #hs-list .row:nth-child(odd) { background: rgba(255,255,255,0.04); }
+  #hs-list .row.me { background: rgba(78,204,163,0.18); }
+  #hs-list .rank { width: 22px; text-align: left; opacity: 0.6; }
+  #hs-list .nm { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hs-list .pt { font-weight: 700; color: #ffd76b; }
+  .empty { opacity: 0.5; font-size: 0.8rem; }
+
+  input[type=text] {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.07);
+    color: #fff;
+    text-align: center;
+    width: 100%;
+    max-width: 220px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  /* ---- Kontroller ---- */
+  #controls {
+    flex: 0 0 auto;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  #dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+    gap: 4px;
+  }
+  #dpad button {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    font-size: 1.2rem;
+    color: #bfe;
+    touch-action: manipulation;
+  }
+  #dpad button:active { background: rgba(78,204,163,0.3); }
+  #dpad .sp { visibility: hidden; }
+  #pause-btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #bfe;
+    box-shadow: none;
+    padding: 10px 16px;
+    font-size: 0.75rem;
+  }
+  #tip { font-size: 0.65rem; opacity: 0.45; margin-top: 6px; text-align: center; flex: 0 0 auto; }
+
+  @media (max-height: 700px) {
+    #dpad { grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); }
+    h1 { margin-bottom: 2px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Fredriks Snake</h1>
+
+<div id="hud">
+  <div class="box"><label>Poäng</label><span id="score">0</span></div>
+  <div class="box"><label>Längd</label><span id="len">3</span></div>
+  <div class="box"><label>Rekord</label><span id="best">0</span></div>
+</div>
+
+<div id="stage">
+  <div id="frame">
+    <canvas id="canvas"></canvas>
+    <div id="overlay">
+      <div id="ov-title">SNAKE</div>
+      <div id="ov-sub">Svep på spelplanen eller använd knapparna</div>
+      <div id="ov-body"></div>
+      <div id="ov-buttons">
+        <button id="start-btn">STARTA</button>
+        <button class="ghost" id="skin-btn">🎨 Utseende</button>
+        <button class="ghost" id="hs-btn">🏆 Topplista</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="controls">
+  <div id="dpad">
+    <button class="sp"></button>
+    <button data-dir="up">▲</button>
+    <button class="sp"></button>
+    <button data-dir="left">◀</button>
+    <button class="sp"></button>
+    <button data-dir="right">▶</button>
+    <button class="sp"></button>
+    <button data-dir="down">▼</button>
+    <button class="sp"></button>
+  </div>
+  <button id="pause-btn">PAUS</button>
+</div>
+
+<div id="tip">Tips: Dela ▸ Lägg till på hemskärmen för fullskärm</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------- Skins ---------------- */
+  var SKINS = [
+    { id: 'emerald', name: 'Smaragd',  head: '#a8ffdc', body: ['#78ffc8', '#28a078'], glow: '#4ecca3', eye: '#001a0d', food: ['#ffb3b3', '#ff3355'], style: 'solid' },
+    { id: 'fire',    name: 'Eld',      head: '#ffd7a0', body: ['#ffb347', '#e2401c'], glow: '#ff8a3d', eye: '#2b0900', food: ['#bdf5ff', '#31c9ff'], style: 'solid' },
+    { id: 'ice',     name: 'Is',       head: '#e7fbff', body: ['#9fe8ff', '#2f7fd1'], glow: '#7ad7ff', eye: '#00243d', food: ['#ffd0f0', '#ff4fbf'], style: 'solid' },
+    { id: 'neon',    name: 'Neon',     head: '#ff9df7', body: ['#e05bff', '#6a1bd1'], glow: '#c25bff', eye: '#1a0033', food: ['#eaff9d', '#8ee600'], style: 'neon' },
+    { id: 'gold',    name: 'Guld',     head: '#fff4c2', body: ['#ffd76b', '#b8860b'], glow: '#ffcc33', eye: '#291d00', food: ['#c8f7ff', '#00c2d1'], style: 'scales' },
+    { id: 'rainbow', name: 'Regnbåge', head: '#ffffff', body: ['#ff5f6d', '#5f9dff'], glow: '#ff8ad1', eye: '#111',    food: ['#ffffff', '#ffd76b'], style: 'rainbow' },
+    { id: 'ghost',   name: 'Spöke',    head: '#ffffff', body: ['#dfe9ff', '#7b8db3'], glow: '#cfe0ff', eye: '#12203a', food: ['#ffd0a0', '#ff7a3d'], style: 'ghost' },
+    { id: 'toxic',   name: 'Giftig',   head: '#eaff8f', body: ['#b6ff3d', '#3f8a00'], glow: '#a6ff2e', eye: '#0f2000', food: ['#ff9de0', '#c81bd1'], style: 'stripe' }
+  ];
+
+  /* ---------------- Lagring ---------------- */
+  var LS_SKIN = 'snake.skin', LS_HS = 'snake.highscores';
+
+  function load(key, fallback) {
+    try {
+      var v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch (e) { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+
+  var highscores = load(LS_HS, []);
+  if (!Array.isArray(highscores)) highscores = [];
+
+  var skinId = load(LS_SKIN, 'emerald');
+  function currentSkin() {
+    for (var i = 0; i < SKINS.length; i++) if (SKINS[i].id === skinId) return SKINS[i];
+    return SKINS[0];
+  }
+
+  function bestScore() { return highscores.length ? highscores[0].score : 0; }
+
+  /* ---------------- Element ---------------- */
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  var frame = document.getElementById('frame');
+  var stage = document.getElementById('stage');
+  var overlay = document.getElementById('overlay');
+  var ovTitle = document.getElementById('ov-title');
+  var ovSub = document.getElementById('ov-sub');
+  var ovBody = document.getElementById('ov-body');
+  var ovButtons = document.getElementById('ov-buttons');
+  var startBtn = document.getElementById('start-btn');
+  var skinBtn = document.getElementById('skin-btn');
+  var hsBtn = document.getElementById('hs-btn');
+  var pauseBtn = document.getElementById('pause-btn');
+  var scoreEl = document.getElementById('score');
+  var lenEl = document.getElementById('len');
+  var bestEl = document.getElementById('best');
+
+  /* ---------------- Spelstate ---------------- */
+  var COLS = 19, ROWS = 19;
+  var cell = 20;                       // px per ruta (sätts i resize)
+  var snake, dir, nextDir, queue, food, score, particles, foodPulse;
+  var timer = null, running = false, paused = false;
+
+  function tickMs() {
+    // Snabbare ju längre ormen är, men aldrig snabbare än 70 ms.
+    return Math.max(70, 150 - (snake.length - 3) * 2.5);
+  }
+
+  /* ---------------- Storlek ---------------- */
+  function resize() {
+    var avail = Math.min(stage.clientWidth, stage.clientHeight);
+    if (!avail) avail = 300;
+    cell = Math.max(8, Math.floor((avail - 4) / COLS));
+    var size = cell * COLS;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    frame.style.width = size + 'px';
+    frame.style.height = size + 'px';
+    if (snake) draw();
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 250); });
+
+  /* ---------------- Init ---------------- */
+  function init() {
+    snake = [{ x: 9, y: 9 }, { x: 8, y: 9 }, { x: 7, y: 9 }];
+    dir = { x: 1, y: 0 };
+    nextDir = { x: 1, y: 0 };
+    queue = [];
+    score = 0;
+    paused = false;
+    particles = [];
+    foodPulse = 0;
+    updateHud();
+    spawnFood();
+    draw();
+  }
+
+  function updateHud() {
+    scoreEl.textContent = String(score);
+    lenEl.textContent = String(snake.length);
+    bestEl.textContent = String(bestScore());
+  }
+
+  function spawnFood() {
+    var free = [];
+    for (var y = 0; y < ROWS; y++) {
+      for (var x = 0; x < COLS; x++) {
+        var taken = false;
+        for (var i = 0; i < snake.length; i++) {
+          if (snake[i].x === x && snake[i].y === y) { taken = true; break; }
+        }
+        if (!taken) free.push({ x: x, y: y });
+      }
+    }
+    food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+  }
+
+  function spawnParticles(gx, gy) {
+    var skin = currentSkin();
+    for (var i = 0; i < 16; i++) {
+      var a = (Math.PI * 2 / 16) * i + Math.random() * 0.3;
+      var sp = Math.random() * 2.5 + 1;
+      particles.push({
+        x: gx * cell + cell / 2,
+        y: gy * cell + cell / 2,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 1, decay: Math.random() * 0.05 + 0.04,
+        size: Math.random() * (cell / 7) + 1,
+        color: i % 2 ? skin.food[0] : skin.food[1]
+      });
+    }
+  }
+
+  /* ---------------- Styrning ---------------- */
+  function turn(dx, dy) {
+    // Jämför mot senast köade riktningen så snabba svep inte äts upp.
+    var last = queue.length ? queue[queue.length - 1] : nextDir;
+    if (last.x === -dx && last.y === -dy) return;   // inte 180 grader
+    if (last.x === dx && last.y === dy) return;     // samma riktning
+    if (queue.length < 2) queue.push({ x: dx, y: dy });
+  }
+
+  var DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+  Array.prototype.forEach.call(document.querySelectorAll('#dpad button[data-dir]'), function (b) {
+    var d = DIRS[b.getAttribute('data-dir')];
+    var fire = function (e) { e.preventDefault(); turn(d[0], d[1]); };
+    b.addEventListener('touchstart', fire, { passive: false });
+    b.addEventListener('mousedown', fire);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowUp' || k === 'w') { turn(0, -1); e.preventDefault(); }
+    else if (k === 'ArrowDown' || k === 's') { turn(0, 1); e.preventDefault(); }
+    else if (k === 'ArrowLeft' || k === 'a') { turn(-1, 0); e.preventDefault(); }
+    else if (k === 'ArrowRight' || k === 'd') { turn(1, 0); e.preventDefault(); }
+    else if (k === 'p' || k === 'P') togglePause();
+    else if (k === ' ' && !running) { e.preventDefault(); startGame(); }
+  });
+
+  // Svep på spelplanen
+  var tStart = null;
+  frame.addEventListener('touchstart', function (e) {
+    var t = e.changedTouches[0];
+    tStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+
+  frame.addEventListener('touchmove', function (e) {
+    if (!tStart || !running || paused) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - tStart.x, dy = t.clientY - tStart.y;
+    var threshold = 22;
+    if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+    if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+    else turn(0, dy > 0 ? 1 : -1);
+    tStart = { x: t.clientX, y: t.clientY };   // tillåt kedjade svep
+    e.preventDefault();
+  }, { passive: false });
+
+  frame.addEventListener('touchend', function () { tStart = null; }, { passive: true });
+
+  pauseBtn.addEventListener('click', togglePause);
+
+  function togglePause() {
+    if (!running) return;
+    paused = !paused;
+    if (paused) {
+      ovTitle.textContent = 'PAUS';
+      ovSub.textContent = 'Tryck fortsätt för att spela vidare';
+      ovBody.innerHTML = '';
+      ovButtons.innerHTML = '';
+      var b = document.createElement('button');
+      b.textContent = 'FORTSÄTT';
+      b.addEventListener('click', togglePause);
+      ovButtons.appendChild(b);
+      overlay.classList.remove('hidden');
+    } else {
+      overlay.classList.add('hidden');
+    }
+  }
+
+  /* ---------------- Loop ---------------- */
+  function update() {
+    if (paused) return;
+
+    if (queue.length) nextDir = queue.shift();
+    dir = nextDir;
+
+    var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) return gameOver();
+    // Svansspetsen flyttar sig samma tick, så den räknas inte som krock.
+    var growing = food && head.x === food.x && head.y === food.y;
+    var limit = growing ? snake.length : snake.length - 1;
+    for (var i = 0; i < limit; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) return gameOver();
+    }
+
+    snake.unshift(head);
+
+    if (growing) {
+      score += 10;
+      spawnParticles(food.x, food.y);
+      spawnFood();
+      updateHud();
+      if (navigator.vibrate) navigator.vibrate(12);
+      // Ny hastighet när ormen växt.
+      clearInterval(timer);
+      timer = setInterval(update, tickMs());
+    } else {
+      snake.pop();
+    }
+
+    foodPulse += 0.14;
+
+    var alive = [];
+    for (var j = 0; j < particles.length; j++) {
+      var p = particles[j];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.92; p.vy *= 0.92;
+      p.life -= p.decay;
+      if (p.life > 0) alive.push(p);
+    }
+    particles = alive;
+
+    draw();
+  }
+
+  /* ---------------- Rendering ---------------- */
+  function roundRect(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function segmentFill(c, skin, i, total, px, py, sz) {
+    if (skin.style === 'rainbow') {
+      var hue = (i * 18 + Date.now() / 20) % 360;
+      return 'hsl(' + hue + ', 85%, 62%)';
+    }
+    if (skin.style === 'stripe' && i % 2 === 0) {
+      return skin.body[1];
+    }
+    var t = 1 - i / Math.max(total, 1);
+    var g = c.createLinearGradient(px, py, px + sz, py + sz);
+    g.addColorStop(0, skin.body[0]);
+    g.addColorStop(1, skin.body[1]);
+    if (skin.style === 'ghost') {
+      c.globalAlpha = 0.35 + t * 0.6;
+    }
+    return g;
+  }
+
+  function draw() {
+    var W = COLS * cell, H = ROWS * cell;
+    var skin = currentSkin();
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#020c18';
+    ctx.fillRect(0, 0, W, H);
+
+    // Rutnät
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    ctx.lineWidth = 0.5;
+    for (var g = 0; g <= COLS; g++) {
+      ctx.beginPath(); ctx.moveTo(g * cell, 0); ctx.lineTo(g * cell, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, g * cell); ctx.lineTo(W, g * cell); ctx.stroke();
+    }
+
+    // Mat
+    if (food) {
+      var pulse = 1 + Math.sin(foodPulse) * 0.15;
+      var fx = food.x * cell + cell / 2, fy = food.y * cell + cell / 2;
+      var fr = Math.max(1, (cell / 2 - cell * 0.12) * pulse);
+      ctx.save();
+      ctx.shadowColor = skin.food[1];
+      ctx.shadowBlur = cell * 0.9 * pulse;
+      var fg = ctx.createRadialGradient(fx - fr * 0.3, fy - fr * 0.3, 1, fx, fy, fr);
+      fg.addColorStop(0, skin.food[0]);
+      fg.addColorStop(1, skin.food[1]);
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(fx, fy, fr, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // Orm
+    var pad = Math.max(1, cell * 0.1);
+    for (var i = snake.length - 1; i >= 0; i--) {
+      var seg = snake[i];
+      var isHead = i === 0;
+      var px = seg.x * cell + pad, py = seg.y * cell + pad, sz = cell - pad * 2;
+
+      ctx.save();
+      ctx.shadowColor = skin.glow;
+      ctx.shadowBlur = isHead ? cell * 0.8 : (skin.style === 'neon' ? cell * 0.5 : cell * 0.25);
+      ctx.fillStyle = isHead ? skin.head : segmentFill(ctx, skin, i, snake.length, px, py, sz);
+      roundRect(ctx, px, py, sz, sz, isHead ? sz * 0.38 : sz * 0.28);
+      ctx.fill();
+
+      if (skin.style === 'scales' && !isHead) {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(px + sz / 2, py + sz / 2, sz * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Ögon
+    if (snake.length) {
+      var hx = snake[0].x * cell, hy = snake[0].y * cell;
+      var eyes = dir.x !== 0
+        ? [{ x: 0.6, y: 0.3 }, { x: 0.6, y: 0.7 }]
+        : [{ x: 0.3, y: 0.6 }, { x: 0.7, y: 0.6 }];
+      if (dir.x < 0) eyes = [{ x: 0.4, y: 0.3 }, { x: 0.4, y: 0.7 }];
+      if (dir.y < 0) eyes = [{ x: 0.3, y: 0.4 }, { x: 0.7, y: 0.4 }];
+      for (var e = 0; e < eyes.length; e++) {
+        var ex = hx + eyes[e].x * cell, ey = hy + eyes[e].y * cell;
+        ctx.fillStyle = skin.eye;
+        ctx.beginPath(); ctx.arc(ex, ey, Math.max(1.5, cell * 0.11), 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(ex - cell * 0.03, ey - cell * 0.03, Math.max(0.7, cell * 0.045), 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Partiklar
+    for (var k = 0; k < particles.length; k++) {
+      var p = particles[k];
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.5, p.size * p.life), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* ---------------- Start / slut ---------------- */
+  function startGame() {
+    overlay.classList.add('hidden');
+    init();
+    running = true;
+    if (timer) clearInterval(timer);
+    timer = setInterval(update, tickMs());
+  }
+
+  function stopLoop() {
+    if (timer) { clearInterval(timer); timer = null; }
+    running = false;
+  }
+
+  function qualifies(s) {
+    if (s <= 0) return false;
+    if (highscores.length < 10) return true;
+    return s > highscores[highscores.length - 1].score;
+  }
+
+  function addScore(name, s, len) {
+    var entry = {
+      name: (name || 'Spelare').slice(0, 12),
+      score: s,
+      len: len,
+      skin: currentSkin().name,
+      date: new Date().toISOString().slice(0, 10),
+      id: Date.now()
+    };
+    highscores.push(entry);
+    highscores.sort(function (a, b) { return b.score - a.score; });
+    highscores = highscores.slice(0, 10);
+    save(LS_HS, highscores);
+    return entry;
+  }
+
+  function gameOver() {
+    stopLoop();
+    if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+    ovTitle.textContent = 'GAME OVER';
+    ovSub.textContent = score + ' poäng · längd ' + snake.length;
+    ovBody.innerHTML = '';
+    ovButtons.innerHTML = '';
+
+    if (qualifies(score)) {
+      var wrap = document.createElement('div');
+      wrap.innerHTML = '<p style="font-size:0.8rem;margin-bottom:8px;color:#ffd76b">🏆 Ny topplacering! Skriv ditt namn:</p>';
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 12;
+      input.placeholder = 'Ditt namn';
+      input.value = load('snake.lastName', '') || '';
+      wrap.appendChild(input);
+      ovBody.appendChild(wrap);
+
+      var saveBtn = document.createElement('button');
+      saveBtn.textContent = 'SPARA';
+      saveBtn.addEventListener('click', function () {
+        var nm = input.value.trim() || 'Spelare';
+        save('snake.lastName', nm);
+        var entry = addScore(nm, score, snake.length);
+        updateHud();
+        showHighscores(entry.id);
+      });
+      ovButtons.appendChild(saveBtn);
+      setTimeout(function () { input.focus(); }, 60);
+    } else {
+      var again = document.createElement('button');
+      again.textContent = 'SPELA IGEN';
+      again.addEventListener('click', startGame);
+      ovButtons.appendChild(again);
+    }
+
+    var hs = document.createElement('button');
+    hs.className = 'ghost';
+    hs.textContent = '🏆 Topplista';
+    hs.addEventListener('click', function () { showHighscores(); });
+    ovButtons.appendChild(hs);
+
+    var sk = document.createElement('button');
+    sk.className = 'ghost';
+    sk.textContent = '🎨 Utseende';
+    sk.addEventListener('click', showSkins);
+    ovButtons.appendChild(sk);
+
+    overlay.classList.remove('hidden');
+  }
+
+  /* ---------------- Menyer ---------------- */
+  function menuButtons(extra) {
+    ovButtons.innerHTML = '';
+    var back = document.createElement('button');
+    back.textContent = running ? 'TILLBAKA' : 'STARTA';
+    back.addEventListener('click', running ? showPauseOrClose : startGame);
+    ovButtons.appendChild(back);
+    if (extra) ovButtons.appendChild(extra);
+  }
+
+  function showPauseOrClose() { overlay.classList.add('hidden'); paused = false; }
+
+  function showHighscores(highlightId) {
+    ovTitle.textContent = 'TOPPLISTA';
+    ovSub.textContent = 'Bästa 10 på den här enheten';
+    ovBody.innerHTML = '';
+
+    var list = document.createElement('div');
+    list.id = 'hs-list';
+    if (!highscores.length) {
+      list.innerHTML = '<p class="empty">Inga resultat än — spela och kom med på listan!</p>';
+    } else {
+      var medals = ['🥇', '🥈', '🥉'];
+      highscores.forEach(function (h, i) {
+        var row = document.createElement('div');
+        row.className = 'row' + (h.id === highlightId ? ' me' : '');
+        row.innerHTML =
+          '<span class="rank">' + (medals[i] || (i + 1) + '.') + '</span>' +
+          '<span class="nm">' + escapeHtml(h.name) + '</span>' +
+          '<span style="opacity:0.45;font-size:0.7rem">' + escapeHtml(h.skin || '') + '</span>' +
+          '<span class="pt">' + h.score + '</span>';
+        list.appendChild(row);
+      });
+    }
+    ovBody.appendChild(list);
+
+    var clear = null;
+    if (highscores.length) {
+      clear = document.createElement('button');
+      clear.className = 'ghost';
+      clear.textContent = 'Rensa';
+      clear.addEventListener('click', function () {
+        if (clear.dataset.confirm === '1') {
+          highscores = [];
+          save(LS_HS, highscores);
+          updateHud();
+          showHighscores();
+        } else {
+          clear.dataset.confirm = '1';
+          clear.textContent = 'Säker? Tryck igen';
+        }
+      });
+    }
+    menuButtons(clear);
+    overlay.classList.remove('hidden');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function skinPreview(skin) {
+    var c = document.createElement('canvas');
+    var s = 20, n = 3;
+    c.width = s * n; c.height = s;
+    c.style.width = (s * n) + 'px';
+    c.style.height = s + 'px';
+    var x = c.getContext('2d');
+    x.fillStyle = '#020c18';
+    x.fillRect(0, 0, c.width, c.height);
+    for (var i = n - 1; i >= 0; i--) {
+      var px = (n - 1 - i) * s + 2, py = 2, sz = s - 4;
+      x.save();
+      x.shadowColor = skin.glow;
+      x.shadowBlur = 6;
+      if (i === 0) {
+        x.fillStyle = skin.head;
+      } else if (skin.style === 'rainbow') {
+        x.fillStyle = 'hsl(' + (i * 60) + ', 85%, 62%)';
+      } else if (skin.style === 'stripe' && i % 2 === 0) {
+        x.fillStyle = skin.body[1];
+      } else {
+        var g = x.createLinearGradient(px, py, px + sz, py + sz);
+        g.addColorStop(0, skin.body[0]);
+        g.addColorStop(1, skin.body[1]);
+        x.fillStyle = g;
+        if (skin.style === 'ghost') x.globalAlpha = 0.7;
+      }
+      roundRect(x, px, py, sz, sz, 5);
+      x.fill();
+      x.restore();
+    }
+    return c;
+  }
+
+  function showSkins() {
+    ovTitle.textContent = 'UTSEENDE';
+    ovSub.textContent = 'Välj hur din orm ska se ut';
+    ovBody.innerHTML = '';
+
+    var grid = document.createElement('div');
+    grid.id = 'skins';
+    SKINS.forEach(function (skin) {
+      var d = document.createElement('div');
+      d.className = 'skin' + (skin.id === skinId ? ' sel' : '');
+      d.appendChild(skinPreview(skin));
+      var label = document.createElement('span');
+      label.textContent = skin.name;
+      d.appendChild(label);
+      d.addEventListener('click', function () {
+        skinId = skin.id;
+        save(LS_SKIN, skinId);
+        Array.prototype.forEach.call(grid.children, function (ch) { ch.classList.remove('sel'); });
+        d.classList.add('sel');
+        document.documentElement.style.setProperty('--accent', skin.glow);
+        if (snake) draw();
+      });
+      grid.appendChild(d);
+    });
+    ovBody.appendChild(grid);
+    menuButtons();
+    overlay.classList.remove('hidden');
+  }
+
+  function showMenu() {
+    ovTitle.textContent = 'SNAKE';
+    ovSub.textContent = 'Svep på spelplanen eller använd knapparna. Ormen växer för varje frukt.';
+    ovBody.innerHTML = '';
+    ovButtons.innerHTML = '';
+    ovButtons.appendChild(startBtn);
+    ovButtons.appendChild(skinBtn);
+    ovButtons.appendChild(hsBtn);
+    overlay.classList.remove('hidden');
+  }
+
+  startBtn.addEventListener('click', startGame);
+  skinBtn.addEventListener('click', showSkins);
+  hsBtn.addEventListener('click', function () { showHighscores(); });
+
+  // Blockera pinch-zoom / dubbeltryck-zoom i Safari
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && running && !paused) togglePause();
+  });
+
+  /* ---------------- Igång ---------------- */
+  document.documentElement.style.setProperty('--accent', currentSkin().glow);
+  resize();
+  init();
+  showMenu();
+  setTimeout(resize, 100);
+})();
+</script>
+</body>
+</html>
